@@ -1,0 +1,52 @@
+[
+  {
+    "lang": "fr",
+    "returnCode": 0,
+    "returnMessage": "OK",
+    "shipment": {
+      "idShip": "AB12345678901",
+      "product": "colissimo",
+      "isFinal": true,
+      "deliveryDate": "2026-01-08T11:14:50+01:00",
+      "entryDate": "2026-01-02T17:32:00+01:00",
+      "estimDate": "2026-01-09T18:00:00+01:00",
+      "timeline": [
+        {
+          "id": 1,
+          "shortLabel": "Pris en charge",
+          "date": "2026-01-02T17:54:00+01:00",
+          "status": true,
+          "code": "ACCEPT"
+        },
+        {
+          "id": 2,
+          "shortLabel": "Distribue",
+          "date": "2026-01-08T11:14:50+01:00",
+          "status": true,
+          "code": "DELIV"
+        }
+      ],
+      "event": [
+        {
+          "group": "DESBAL",
+          "code": "DI1",
+          "label": "Colis livre au destinataire",
+          "date": "2026-01-08T11:14:50+01:00",
+          "country": "FR",
+          "category": "distribution",
+          "order": 5
+        },
+        {
+          "group": "ACHNAT",
+          "code": "TR1",
+          "label": "Votre colis est en transit",
+          "date": "2026-01-07T10:42:00+01:00",
+          "country": "FR",
+          "category": "transport",
+          "order": 4
+        }
+      ],
+      "url": "https://www.laposte.fr"
+    }
+  }
+]

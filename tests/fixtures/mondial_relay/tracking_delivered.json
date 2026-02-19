@@ -1,0 +1,50 @@
+{
+  "CodeRetour": 0,
+  "Message": "OK",
+  "Data": {
+    "SuiviParEtapes": [
+      {
+        "Etape": 1,
+        "Libelle": "Colis en preparation chez l'expediteur",
+        "Atteint": true
+      },
+      {
+        "Etape": 2,
+        "Libelle": "Colis remis a Mondial Relay",
+        "Atteint": true
+      },
+      {
+        "Etape": 3,
+        "Libelle": "Colis sur l'agence de livraison",
+        "Atteint": true
+      },
+      {
+        "Etape": 4,
+        "Libelle": "Colis disponible au point de retrait",
+        "Atteint": true
+      },
+      {
+        "Etape": 5,
+        "Libelle": "Colis livre au destinataire",
+        "Actif": true,
+        "Atteint": true
+      }
+    ],
+    "Evenements": [
+      {
+        "Date": "2026-01-08T11:14:50Z",
+        "Libelle": "Colis livre au destinataire",
+        "Lieu": "CITY-TEST",
+        "Code": "DELIVERED"
+      },
+      {
+        "Date": "2026-01-07T17:16:00Z",
+        "Libelle": "Colis disponible au point de retrait",
+        "Lieu": "CITY-TEST",
+        "Code": "READY"
+      }
+    ],
+    "DateLivraisonPrevue": "2026-01-09T18:00:00Z",
+    "CodePostal": "00000"
+  }
+}
