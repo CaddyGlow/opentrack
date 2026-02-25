@@ -1,8 +1,10 @@
 use clap::{Args, Parser, Subcommand};
 
+const APP_VERSION: &str = env!("OPENTRACK_VERSION");
+
 #[derive(Debug, Parser)]
 #[command(name = "opentrack")]
-#[command(version)]
+#[command(version = APP_VERSION)]
 #[command(about = "Async parcel tracking CLI")]
 pub struct Cli {
     #[command(subcommand)]
