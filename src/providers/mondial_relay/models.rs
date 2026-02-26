@@ -295,11 +295,6 @@ where
             .map(|item| serde_json::from_value(item).map_err(D::Error::custom))
             .collect(),
         serde_json::Value::Object(map) => {
-            let as_object = serde_json::Value::Object(map.clone());
-            if let Ok(single) = serde_json::from_value::<T>(as_object) {
-                return Ok(vec![single]);
-            }
-
             let mut values: Vec<(String, serde_json::Value)> = map.into_iter().collect();
             values.sort_by(|(left, _), (right, _)| {
                 match (left.parse::<u32>(), right.parse::<u32>()) {
@@ -307,10 +302,19 @@ where
                     _ => left.cmp(right),
                 }
             });
-            values
-                .into_iter()
-                .map(|(_, item)| serde_json::from_value(item).map_err(D::Error::custom))
-                .collect()
+
+            let keyed_items: std::result::Result<Vec<T>, _> = values
+                .iter()
+                .map(|(_, item)| serde_json::from_value(item.clone()))
+                .collect();
+            if let Ok(items) = keyed_items {
+                return Ok(items);
+            }
+
+            let as_object = serde_json::Value::Object(values.into_iter().collect());
+            serde_json::from_value::<T>(as_object)
+                .map(|single| vec![single])
+                .map_err(D::Error::custom)
         }
         other => serde_json::from_value::<T>(other)
             .map(|single| vec![single])
@@ -375,6 +379,23 @@ mod tests {
         }"#;
         let parsed: MondialRelayResponse = serde_json::from_str(payload).expect("valid json");
         assert_eq!(parsed.events_recursive().len(), 2);
+    }
+
+    #[test]
+    fn parses_events_from_single_object_shape() {
+        let payload = r#"{
+          "Expedition": {
+            "Evenements": {
+              "Date":"2026-01-02T17:32:32.765",
+              "Libelle":"A",
+              "Code":"X"
+            }
+          }
+        }"#;
+        let parsed: MondialRelayResponse = serde_json::from_str(payload).expect("valid json");
+        let events = parsed.events_recursive();
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].description.as_deref(), Some("A"));
     }
 
     #[test]

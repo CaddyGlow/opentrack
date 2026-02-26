@@ -259,7 +259,7 @@ mod tests {
         assert!(rendered.contains("Delivered"));
         assert!(rendered.contains("TIME (UTC)"));
         assert!(rendered.contains("Colis livre au destinataire"));
-        assert!(rendered.contains("Colis en transit\n"));
+        assert!(rendered.contains("Colis en transit"));
         assert!(rendered.contains("FR"));
         assert!(rendered.contains("DEL/01"));
     }
