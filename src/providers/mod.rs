@@ -7,6 +7,7 @@ use crate::config::Config;
 use crate::tracking::{TrackOptions, TrackingInfo};
 use crate::{Error, Result};
 
+pub mod chronopost;
 pub mod laposte;
 pub mod mondial_relay;
 
@@ -40,6 +41,10 @@ impl ProviderRegistry {
             Box::new(laposte::LaposteProvider::new(
                 client.clone(),
                 config.providers.laposte.lang.clone(),
+            )),
+            Box::new(chronopost::ChronopostProvider::new(
+                client.clone(),
+                config.providers.chronopost.lang.clone(),
             )),
             Box::new(mondial_relay::MondialRelayProvider::new(
                 client,
@@ -173,5 +178,11 @@ mod tests {
         assert!(!mondial_relay::MondialRelayProvider::detect_id(
             "AB12345678901"
         ));
+    }
+
+    #[test]
+    fn chronopost_detection_works() {
+        assert!(chronopost::ChronopostProvider::detect_id("XM002774533TS"));
+        assert!(!chronopost::ChronopostProvider::detect_id("12345678"));
     }
 }

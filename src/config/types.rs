@@ -66,6 +66,7 @@ impl Default for CdpConfig {
 pub struct ProvidersConfig {
     pub mondial_relay: MondialRelayConfig,
     pub laposte: LaposteConfig,
+    pub chronopost: ChronopostConfig,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -102,6 +103,20 @@ pub struct LaposteConfig {
 }
 
 impl Default for LaposteConfig {
+    fn default() -> Self {
+        Self {
+            lang: "fr".to_string(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(default)]
+pub struct ChronopostConfig {
+    pub lang: String,
+}
+
+impl Default for ChronopostConfig {
     fn default() -> Self {
         Self {
             lang: "fr".to_string(),
