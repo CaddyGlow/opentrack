@@ -22,9 +22,8 @@ pub struct ChronopostEvent {
 static ERROR_CODE_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"<errorCode>(\d+)</errorCode>").expect("valid regex"));
 
-static SKYBILL_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"<skybillNumber>([^<]+)</skybillNumber>").expect("valid regex")
-});
+static SKYBILL_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"<skybillNumber>([^<]+)</skybillNumber>").expect("valid regex"));
 
 static EVENT_BLOCK_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"<events>([\s\S]*?)</events>").expect("valid regex"));
@@ -99,10 +98,7 @@ mod tests {
         let xml = include_str!("../../../tests/fixtures/chronopost/tracking_intransit.xml");
         let parsed = ChronopostResponse::parse(xml).expect("valid xml");
         assert_eq!(parsed.error_code, 0);
-        assert_eq!(
-            parsed.skybill_number.as_deref(),
-            Some("XM002774533TS")
-        );
+        assert_eq!(parsed.skybill_number.as_deref(), Some("XM002774533TS"));
         assert!(!parsed.events.is_empty());
         assert_eq!(parsed.events[0].code, "DC");
     }

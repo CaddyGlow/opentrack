@@ -48,11 +48,7 @@ impl ApiTransport {
         }
     }
 
-    async fn get_request_verification_token(
-        &self,
-        parcel_id: &str,
-        brand: &str,
-    ) -> Result<String> {
+    async fn get_request_verification_token(&self, parcel_id: &str, brand: &str) -> Result<String> {
         if let Some(token) = self.request_verification_token.read().await.clone() {
             tracing::debug!(
                 provider = "mondial-relay",
@@ -70,8 +66,7 @@ impl ApiTransport {
             brand = %brand,
             "fetching Mondial Relay tracking page to extract requestverificationtoken"
         );
-        let html =
-            api::fetch_tracking_page(&self.client, parcel_id, &self.country, brand).await?;
+        let html = api::fetch_tracking_page(&self.client, parcel_id, &self.country, brand).await?;
         let token = token::extract_request_verification_token(&html).ok_or_else(|| {
             tracing::warn!(
                 provider = "mondial-relay",
@@ -117,7 +112,9 @@ impl TrackingTransport for ApiTransport {
         opts: &TrackOptions,
         brand: &str,
     ) -> Result<models::MondialRelayResponse> {
-        let token = self.get_request_verification_token(parcel_id, brand).await?;
+        let token = self
+            .get_request_verification_token(parcel_id, brand)
+            .await?;
         let mut response = api::fetch_tracking(
             &self.client,
             parcel_id,
@@ -178,12 +175,7 @@ impl TrackingTransport for CdpTransport {
     ) -> Result<models::MondialRelayResponse> {
         let body = self
             .browser
-            .fetch_tracking_response_body(
-                parcel_id,
-                opts.postcode.as_deref(),
-                brand,
-                &self.country,
-            )
+            .fetch_tracking_response_body(parcel_id, opts.postcode.as_deref(), brand, &self.country)
             .await?;
         api::parse_tracking_response(&body, opts.postcode.is_some())
     }

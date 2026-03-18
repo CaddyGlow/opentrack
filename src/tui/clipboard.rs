@@ -21,9 +21,7 @@ pub fn copy_osc52(text: &str) -> io::Result<()> {
         osc52
     };
 
-    let mut tty = std::fs::OpenOptions::new()
-        .write(true)
-        .open("/dev/tty")?;
+    let mut tty = std::fs::OpenOptions::new().write(true).open("/dev/tty")?;
     tty.write_all(payload.as_bytes())?;
     tty.flush()
 }

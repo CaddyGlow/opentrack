@@ -21,11 +21,7 @@ pub async fn fetch_tracking(
         "sending Chronopost tracking API request"
     );
 
-    let response = client
-        .get(&url)
-        .header("Referer", referer)
-        .send()
-        .await?;
+    let response = client.get(&url).header("Referer", referer).send().await?;
 
     let status = response.status();
     let body = response.text().await?;

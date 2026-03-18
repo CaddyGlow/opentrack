@@ -333,7 +333,10 @@ async fn handle_event(
                 match registry.tracking_url(&parcel.entry.provider, &parcel.entry.id) {
                     Ok(url) => {
                         if let Err(err) = open::that(&url) {
-                            app.set_flash(FlashKind::Error, format!("Failed to open browser: {err}"));
+                            app.set_flash(
+                                FlashKind::Error,
+                                format!("Failed to open browser: {err}"),
+                            );
                         } else {
                             app.set_flash(FlashKind::Success, format!("Opened {url}"));
                         }

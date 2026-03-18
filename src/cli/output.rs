@@ -182,10 +182,7 @@ pub fn print_list(rows: &[ListRow], as_json: bool) -> Result<()> {
     table.set_header(["ID", "PROVIDER", "LABEL", "STATUS", "LAST EVENT"]);
 
     for row in rows {
-        let status_text = row
-            .status
-            .as_deref()
-            .unwrap_or("(not fetched)");
+        let status_text = row.status.as_deref().unwrap_or("(not fetched)");
 
         let color = match status_text {
             "Delivered" => status_color(&TrackingStatus::Delivered),

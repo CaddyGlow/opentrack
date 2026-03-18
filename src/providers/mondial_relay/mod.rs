@@ -33,8 +33,7 @@ impl MondialRelayProvider {
         mode: MondialRelayMode,
         cdp_browser: Arc<browser_cdp::SharedCdpBrowser>,
     ) -> Self {
-        let transport =
-            transport::build_tracking_transport(client, country, mode, cdp_browser);
+        let transport = transport::build_tracking_transport(client, country, mode, cdp_browser);
         // Put the configured brand first, then append any other known brands.
         let mut brands = vec![brand.clone()];
         for &known in KNOWN_BRANDS {

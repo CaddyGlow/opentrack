@@ -72,8 +72,8 @@ impl ChronopostProvider {
             "DB" | "SD" => TrackingStatus::InTransit,
 
             // In transit / sorting / transfer
-            "PC" | "TT" | "TS" | "EC" | "RG" | "TA" | "TC" | "ET" | "EP" | "AG" | "SC"
-            | "SM" | "RB" | "RE" | "AA" => TrackingStatus::InTransit,
+            "PC" | "TT" | "TS" | "EC" | "RG" | "TA" | "TC" | "ET" | "EP" | "AG" | "SC" | "SM"
+            | "RB" | "RE" | "AA" => TrackingStatus::InTransit,
 
             // Out for delivery
             "MD" | "ML" | "MC" => TrackingStatus::OutForDelivery,
@@ -182,10 +182,7 @@ impl Provider for ChronopostProvider {
         if response.error_code != 0 {
             return Err(Error::ProviderError {
                 code: response.error_code,
-                message: format!(
-                    "Chronopost returned error code {}",
-                    response.error_code
-                ),
+                message: format!("Chronopost returned error code {}", response.error_code),
             });
         }
 
