@@ -15,6 +15,7 @@ pub struct App {
     pub mode: AppMode,
     pub add_form: AddForm,
     pub flash: Option<FlashMessage>,
+    pub global_logs: VecDeque<LogEntry>,
     spinner_tick: usize,
 }
 
@@ -45,18 +46,13 @@ pub enum FlashKind {
     Error,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum LogLevel {
     Error,
     Warn,
+    #[default]
     Info,
     Debug,
-}
-
-impl Default for LogLevel {
-    fn default() -> Self {
-        Self::Info
-    }
 }
 
 impl LogLevel {
@@ -221,6 +217,7 @@ impl App {
             mode: AppMode::Normal,
             add_form: AddForm::default(),
             flash: None,
+            global_logs: VecDeque::new(),
             spinner_tick: 0,
         };
         let provider_hint = app
@@ -379,6 +376,17 @@ impl App {
             let _ = parcel.logs.pop_front();
         }
         parcel.logs.push_back(LogEntry {
+            timestamp: Utc::now(),
+            level,
+            message: message.into().replace('\n', " "),
+        });
+    }
+
+    pub fn push_global_log(&mut self, level: LogLevel, message: impl Into<String>) {
+        if self.global_logs.len() >= MAX_LOG_ENTRIES {
+            let _ = self.global_logs.pop_front();
+        }
+        self.global_logs.push_back(LogEntry {
             timestamp: Utc::now(),
             level,
             message: message.into().replace('\n', " "),

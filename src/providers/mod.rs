@@ -16,6 +16,8 @@ pub trait Provider: Send + Sync {
     fn id(&self) -> &'static str;
     fn name(&self) -> &'static str;
     fn detect(&self, parcel_id: &str) -> bool;
+    /// Return the public web tracking URL for the given parcel ID.
+    fn tracking_url(&self, parcel_id: &str, opts: &TrackOptions) -> String;
     async fn track(&self, parcel_id: &str, opts: &TrackOptions) -> Result<TrackingInfo>;
 }
 
@@ -71,6 +73,11 @@ impl ProviderRegistry {
             .find(|provider| provider.id() == provider_id)
             .map(std::ops::Deref::deref)
             .ok_or_else(|| Error::ProviderNotFound(provider_id.to_string()))
+    }
+
+    pub fn tracking_url(&self, provider_id: &str, parcel_id: &str) -> Result<String> {
+        let provider = self.get_by_id(provider_id)?;
+        Ok(provider.tracking_url(parcel_id, &TrackOptions::default()))
     }
 
     pub fn auto_detect(&self, parcel_id: &str) -> Result<&dyn Provider> {
@@ -147,7 +154,7 @@ fn resolved_browser_proxy_server(config: &Config) -> Option<String> {
     let all = env_proxy_value(&["ALL_PROXY", "all_proxy"]);
 
     let http = http.or_else(|| all.clone());
-    let https = https.or_else(|| all);
+    let https = https.or(all);
 
     match (http, https) {
         (Some(http), Some(https)) if http == https => Some(http),

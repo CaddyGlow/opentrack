@@ -36,13 +36,13 @@ impl LaposteProvider {
         prefix_ok && rest_ok
     }
 
-    fn map_status(group: &str, is_final: bool) -> TrackingStatus {
+    fn map_status(group: &str, _is_final: bool) -> TrackingStatus {
         match group {
             "EXPANN" => TrackingStatus::PreShipment,
             "ACHNAT" | "DISARR" => TrackingStatus::InTransit,
             "DISTOU" => TrackingStatus::OutForDelivery,
-            "DESBAL" | "DESTIN" if is_final => TrackingStatus::Delivered,
-            "DESBAL" | "DESTIN" => TrackingStatus::Delivered,
+            "DISMAD" => TrackingStatus::OutForDelivery,
+            "DESBAL" | "DESTIN" | "DESLIVD" => TrackingStatus::Delivered,
             "RETOUR" => TrackingStatus::Exception,
             _ => TrackingStatus::Unknown,
         }
@@ -106,6 +106,10 @@ impl Provider for LaposteProvider {
 
     fn detect(&self, parcel_id: &str) -> bool {
         Self::detect_id(parcel_id)
+    }
+
+    fn tracking_url(&self, parcel_id: &str, _opts: &TrackOptions) -> String {
+        format!("https://www.laposte.fr/outils/suivre-vos-envois?code={parcel_id}")
     }
 
     async fn track(&self, parcel_id: &str, opts: &TrackOptions) -> Result<TrackingInfo> {

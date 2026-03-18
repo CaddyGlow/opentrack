@@ -124,7 +124,7 @@ impl Default for ChronopostConfig {
     }
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(default)]
 pub struct ParcelEntry {
     pub id: String,
@@ -133,19 +133,6 @@ pub struct ParcelEntry {
     pub postcode: Option<String>,
     pub lang: Option<String>,
     pub notify: Option<bool>,
-}
-
-impl Default for ParcelEntry {
-    fn default() -> Self {
-        Self {
-            id: String::new(),
-            provider: String::new(),
-            label: None,
-            postcode: None,
-            lang: None,
-            notify: None,
-        }
-    }
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

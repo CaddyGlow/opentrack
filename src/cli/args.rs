@@ -42,7 +42,7 @@ pub struct TrackArgs {
 pub struct AddArgs {
     pub id: String,
     #[arg(long)]
-    pub provider: String,
+    pub provider: Option<String>,
     #[arg(long)]
     pub label: Option<String>,
     #[arg(long)]

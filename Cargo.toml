@@ -9,10 +9,12 @@ async-trait = "0.1"
 chrono = { version = "0.4", features = ["serde"] }
 clap = { version = "4", features = ["derive"] }
 comfy-table = { version = "7", features = ["custom_styling"] }
-crossterm = "0.28"
+base64 = "0.22"
+crossterm = "0.29"
 chromiumoxide = "0.8"
 futures = "0.3"
-ratatui = "0.29"
+open = "5"
+ratatui = "0.30"
 regex = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -20,7 +22,7 @@ thiserror = "1"
 tokio = { version = "1", features = ["full"] }
 toml = "0.8"
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter", "registry"] }
 wreq = { version = "6.0.0-rc.28", features = ["json", "socks", "gzip", "brotli", "cookies"] }
 wreq-util = "3.0.0-rc.10"
 xdg = "2"

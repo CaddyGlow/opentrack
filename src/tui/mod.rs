@@ -1,4 +1,5 @@
 pub mod app;
+pub mod clipboard;
 
 use std::io;
 use std::sync::Arc;
@@ -17,6 +18,7 @@ use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph, Wrap};
 use tokio::sync::mpsc;
+use tracing_subscriber::prelude::*;
 
 use crate::Result;
 use crate::cache::store;
@@ -33,6 +35,66 @@ enum UiMessage {
         index: usize,
         result: std::result::Result<TrackingInfo, String>,
     },
+    TracingEvent {
+        level: LogLevel,
+        message: String,
+    },
+}
+
+/// Tracing layer that forwards log events into the TUI via the UI message channel.
+struct TuiLayer {
+    tx: mpsc::UnboundedSender<UiMessage>,
+}
+
+impl<S: tracing::Subscriber> tracing_subscriber::Layer<S> for TuiLayer {
+    fn on_event(
+        &self,
+        event: &tracing::Event<'_>,
+        _ctx: tracing_subscriber::layer::Context<'_, S>,
+    ) {
+        let level = match *event.metadata().level() {
+            tracing::Level::ERROR => LogLevel::Error,
+            tracing::Level::WARN => LogLevel::Warn,
+            tracing::Level::INFO => LogLevel::Info,
+            _ => LogLevel::Debug,
+        };
+
+        let mut visitor = TracingMessageVisitor(String::new());
+        event.record(&mut visitor);
+
+        let target = event.metadata().target();
+        let message = if target.is_empty() {
+            visitor.0
+        } else {
+            format!("[{target}] {}", visitor.0)
+        };
+
+        let _ = self.tx.send(UiMessage::TracingEvent { level, message });
+    }
+}
+
+struct TracingMessageVisitor(String);
+
+impl tracing::field::Visit for TracingMessageVisitor {
+    fn record_str(&mut self, field: &tracing::field::Field, value: &str) {
+        if field.name() == "message" {
+            self.0 = value.to_string();
+        } else if self.0.is_empty() {
+            self.0 = format!("{}: {value}", field.name());
+        } else {
+            self.0.push_str(&format!(", {}: {value}", field.name()));
+        }
+    }
+
+    fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn std::fmt::Debug) {
+        if field.name() == "message" {
+            self.0 = format!("{value:?}");
+        } else if self.0.is_empty() {
+            self.0 = format!("{}: {value:?}", field.name());
+        } else {
+            self.0.push_str(&format!(", {}: {value:?}", field.name()));
+        }
+    }
 }
 
 struct TerminalGuard;
@@ -61,6 +123,17 @@ pub async fn run() -> Result<()> {
         let mut terminal = Terminal::new(backend)?;
 
         let (tx, mut rx) = mpsc::unbounded_channel::<UiMessage>();
+
+        // Install a tracing subscriber that routes log output into the TUI
+        // instead of writing to stderr (which would corrupt the display).
+        let filter = tracing_subscriber::EnvFilter::try_from_default_env()
+            .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"));
+        let tui_layer = TuiLayer { tx: tx.clone() };
+        let _ = tracing_subscriber::registry()
+            .with(filter)
+            .with(tui_layer)
+            .try_init();
+
         if !app.is_empty() {
             spawn_refresh_all(&mut app, &registry, &tx);
         }
@@ -95,6 +168,9 @@ pub async fn run() -> Result<()> {
                             );
                         }
                     },
+                    UiMessage::TracingEvent { level, message } => {
+                        app.push_global_log(level, message);
+                    }
                 }
             }
 
@@ -214,6 +290,58 @@ async fn handle_event(
                     FlashKind::Info,
                     format!("Log filter set to {}+", level.as_str()),
                 );
+            } else {
+                app.set_flash(FlashKind::Info, "No tracking selected");
+            }
+        }
+        KeyCode::Char('y') => {
+            if let Some(parcel) = app.selected_parcel() {
+                let id = &parcel.entry.id;
+                match clipboard::copy_osc52(id) {
+                    Ok(()) => {
+                        app.set_flash(FlashKind::Success, format!("Copied {id}"));
+                    }
+                    Err(err) => {
+                        app.set_flash(FlashKind::Error, format!("Clipboard error: {err}"));
+                    }
+                }
+            } else {
+                app.set_flash(FlashKind::Info, "No tracking selected");
+            }
+        }
+        KeyCode::Char('o') => {
+            if let Some(parcel) = app.selected_parcel() {
+                match registry.tracking_url(&parcel.entry.provider, &parcel.entry.id) {
+                    Ok(url) => match clipboard::copy_osc52(&url) {
+                        Ok(()) => {
+                            app.set_flash(FlashKind::Success, format!("Copied {url}"));
+                        }
+                        Err(err) => {
+                            app.set_flash(FlashKind::Error, format!("Clipboard error: {err}"));
+                        }
+                    },
+                    Err(err) => {
+                        app.set_flash(FlashKind::Error, format!("URL error: {err}"));
+                    }
+                }
+            } else {
+                app.set_flash(FlashKind::Info, "No tracking selected");
+            }
+        }
+        KeyCode::Char('O') => {
+            if let Some(parcel) = app.selected_parcel() {
+                match registry.tracking_url(&parcel.entry.provider, &parcel.entry.id) {
+                    Ok(url) => {
+                        if let Err(err) = open::that(&url) {
+                            app.set_flash(FlashKind::Error, format!("Failed to open browser: {err}"));
+                        } else {
+                            app.set_flash(FlashKind::Success, format!("Opened {url}"));
+                        }
+                    }
+                    Err(err) => {
+                        app.set_flash(FlashKind::Error, format!("URL error: {err}"));
+                    }
+                }
             } else {
                 app.set_flash(FlashKind::Info, "No tracking selected");
             }
@@ -594,6 +722,12 @@ fn draw_top(frame: &mut ratatui::Frame<'_>, area: Rect, app: &App) {
             Span::raw(" logs  "),
             Span::styled("[[]/[]]", Style::default().fg(Color::DarkGray)),
             Span::raw(" level  "),
+            Span::styled("[y]", Style::default().fg(Color::Cyan)),
+            Span::raw(" yank  "),
+            Span::styled("[o]", Style::default().fg(Color::Cyan)),
+            Span::raw(" copy url  "),
+            Span::styled("[O]", Style::default().fg(Color::Cyan)),
+            Span::raw(" open url  "),
             Span::styled("[r]", Style::default().fg(Color::Yellow)),
             Span::raw(" refresh  "),
             Span::styled("[R]", Style::default().fg(Color::Yellow)),
@@ -872,10 +1006,12 @@ fn draw_footer(frame: &mut ratatui::Frame<'_>, area: Rect, app: &App) {
 }
 
 fn draw_logs(frame: &mut ratatui::Frame<'_>, area: Rect, app: &App) {
-    let title = app
+    let min_level = app
         .selected_parcel()
-        .map(|parcel| format!("LOGS [{}+]", parcel.min_log_level.as_str()))
-        .unwrap_or_else(|| "LOGS".to_string());
+        .map(|parcel| parcel.min_log_level)
+        .unwrap_or(LogLevel::Info);
+
+    let title = format!("LOGS [{}+]", min_level.as_str());
 
     let block = Block::default()
         .borders(Borders::ALL)
@@ -884,23 +1020,24 @@ fn draw_logs(frame: &mut ratatui::Frame<'_>, area: Rect, app: &App) {
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
-    let Some(parcel) = app.selected_parcel() else {
-        frame.render_widget(
-            Paragraph::new("No parcel selected").style(Style::default().fg(Color::DarkGray)),
-            inner,
-        );
-        return;
-    };
+    // Merge per-parcel logs with global tracing logs, sorted by timestamp.
+    let parcel_logs = app
+        .selected_parcel()
+        .map(|parcel| parcel.logs.iter().collect::<Vec<_>>())
+        .unwrap_or_default();
+    let global_logs: Vec<_> = app.global_logs.iter().collect();
+
+    let mut merged: Vec<_> = parcel_logs
+        .into_iter()
+        .chain(global_logs)
+        .filter(|entry| min_level.allows(entry.level))
+        .collect();
+    merged.sort_by_key(|entry| entry.timestamp);
 
     let visible_rows = inner.height as usize;
-    let filtered: Vec<_> = parcel
-        .logs
-        .iter()
-        .filter(|entry| parcel.min_log_level.allows(entry.level))
-        .collect();
-    let start = filtered.len().saturating_sub(visible_rows);
+    let start = merged.len().saturating_sub(visible_rows);
 
-    let rows: Vec<ListItem<'_>> = filtered
+    let rows: Vec<ListItem<'_>> = merged
         .into_iter()
         .skip(start)
         .map(|entry| {
@@ -941,6 +1078,9 @@ K / PageUp: Scroll events up\n\
 r: Refresh selected parcel\n\
 R: Refresh all parcels\n\
 a: Add tracking entry\n\
+y: Copy tracking number to clipboard\n\
+o: Copy tracking URL to clipboard\n\
+O: Open tracking URL in browser\n\
 d / Delete: Remove selected tracking\n\
 l: Show/hide logs for selected tracking\n\
 [ / ]: Decrease/increase log filter level\n\

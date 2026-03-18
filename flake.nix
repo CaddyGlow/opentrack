@@ -22,6 +22,7 @@
 
           packages = [
             pkgs.cargo
+            pkgs.clippy
             pkgs.rustc
             pkgs.cmake
             pkgs.perl

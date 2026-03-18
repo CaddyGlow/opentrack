@@ -170,6 +170,10 @@ impl Provider for ChronopostProvider {
         Self::detect_id(parcel_id)
     }
 
+    fn tracking_url(&self, parcel_id: &str, _opts: &TrackOptions) -> String {
+        format!("https://www.chronopost.fr/tracking-no-cms/suivi-page?listeNumerosLT={parcel_id}")
+    }
+
     async fn track(&self, parcel_id: &str, opts: &TrackOptions) -> Result<TrackingInfo> {
         let lang = opts.lang.as_deref().unwrap_or(&self.default_lang);
         let xml = api::fetch_tracking(&self.client, parcel_id, lang).await?;

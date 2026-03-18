@@ -15,9 +15,13 @@ use opentrack::tracking::TrackOptions;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    init_tracing()?;
-
     let cli = cli::Cli::parse();
+
+    // TUI sets up its own tracing subscriber that routes logs into the UI.
+    if !matches!(cli.command, Commands::Tui) {
+        init_tracing()?;
+    }
+
     match cli.command {
         Commands::Config(args) => run_config(args).await,
         Commands::Tui => {
@@ -94,19 +98,20 @@ async fn run_add(
     config: &mut Config,
     args: AddArgs,
 ) -> anyhow::Result<()> {
-    registry.get_by_id(&args.provider)?;
+    let provider = resolve_provider(registry, args.provider.as_deref(), &args.id)?;
+    let provider_id = provider.id().to_string();
 
     let exists = config
         .parcels
         .iter()
-        .any(|parcel| parcel.id == args.id && parcel.provider == args.provider);
+        .any(|parcel| parcel.id == args.id && parcel.provider == provider_id);
     if exists {
-        anyhow::bail!("parcel already exists: {}/{}", args.provider, args.id);
+        anyhow::bail!("parcel already exists: {}/{}", provider_id, args.id);
     }
 
     config.parcels.push(ParcelEntry {
         id: args.id,
-        provider: args.provider,
+        provider: provider_id,
         label: args.label,
         postcode: args.postcode,
         lang: args.lang,
@@ -314,12 +319,11 @@ async fn track_with_cache(
     parcel_id: &str,
     options: &TrackOptions,
 ) -> anyhow::Result<opentrack::tracking::TrackingInfo> {
-    if !options.no_cache {
-        if let Some(cached) =
+    if !options.no_cache
+        && let Some(cached) =
             cache::read_fresh(provider.id(), parcel_id, config.general.cache_ttl).await?
-        {
-            return Ok(cached);
-        }
+    {
+        return Ok(cached);
     }
 
     let info = provider.track(parcel_id, options).await?;

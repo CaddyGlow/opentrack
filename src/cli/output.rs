@@ -184,8 +184,7 @@ pub fn print_list(rows: &[ListRow], as_json: bool) -> Result<()> {
     for row in rows {
         let status_text = row
             .status
-            .as_ref()
-            .map(std::string::String::as_str)
+            .as_deref()
             .unwrap_or("(not fetched)");
 
         let color = match status_text {

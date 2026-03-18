@@ -149,12 +149,11 @@ impl MondialRelayProvider {
         events: &[TrackingEvent],
         fallback_steps_count: usize,
     ) -> TrackingStatus {
-        if let Some(active_step) = steps.iter().find(|step| step.is_active()) {
-            if let Some(text) = active_step.as_text() {
-                if let Some(status) = Self::map_status_text(text) {
-                    return status;
-                }
-            }
+        if let Some(active_step) = steps.iter().find(|step| step.is_active())
+            && let Some(text) = active_step.as_text()
+            && let Some(status) = Self::map_status_text(text)
+        {
+            return status;
         }
 
         if let Some((_, reached_step)) = steps
@@ -162,18 +161,16 @@ impl MondialRelayProvider {
             .enumerate()
             .filter(|(_, step)| step.is_reached())
             .max_by_key(|(idx, step)| step.rank(*idx))
+            && let Some(text) = reached_step.as_text()
+            && let Some(status) = Self::map_status_text(text)
         {
-            if let Some(text) = reached_step.as_text() {
-                if let Some(status) = Self::map_status_text(text) {
-                    return status;
-                }
-            }
+            return status;
         }
 
-        if let Some(event) = events.first() {
-            if let Some(status) = Self::map_status_text(&event.description) {
-                return status;
-            }
+        if let Some(event) = events.first()
+            && let Some(status) = Self::map_status_text(&event.description)
+        {
+            return status;
         }
 
         if fallback_steps_count == 0 {
@@ -294,6 +291,13 @@ impl Provider for MondialRelayProvider {
 
     fn detect(&self, parcel_id: &str) -> bool {
         Self::detect_id(parcel_id)
+    }
+
+    fn tracking_url(&self, parcel_id: &str, _opts: &TrackOptions) -> String {
+        let brand = self.brands.first().map(String::as_str).unwrap_or("PP");
+        format!(
+            "https://www.mondialrelay.fr/suivi-de-colis?codeMarque={brand}&numeroExpedition={parcel_id}&pays=FR&language=fr"
+        )
     }
 
     async fn track(&self, parcel_id: &str, opts: &TrackOptions) -> Result<TrackingInfo> {
