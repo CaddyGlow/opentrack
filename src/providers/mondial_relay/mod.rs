@@ -15,8 +15,13 @@ mod transport;
 
 use transport::TrackingTransport;
 
+/// Known Mondial Relay brand codes. The configured brand is tried first,
+/// then the remaining alternatives are attempted on "no parcel found" errors.
+const KNOWN_BRANDS: &[&str] = &["PP", "MR", "CC", "24R"];
+
 pub struct MondialRelayProvider {
     transport: Box<dyn TrackingTransport>,
+    brands: Vec<String>,
 }
 
 impl MondialRelayProvider {
@@ -29,8 +34,15 @@ impl MondialRelayProvider {
         cdp_browser: Arc<browser_cdp::SharedCdpBrowser>,
     ) -> Self {
         let transport =
-            transport::build_tracking_transport(client, country, brand, mode, cdp_browser);
-        Self { transport }
+            transport::build_tracking_transport(client, country, mode, cdp_browser);
+        // Put the configured brand first, then append any other known brands.
+        let mut brands = vec![brand.clone()];
+        for &known in KNOWN_BRANDS {
+            if !known.eq_ignore_ascii_case(&brand) {
+                brands.push(known.to_string());
+            }
+        }
+        Self { transport, brands }
     }
 
     pub fn detect_id(parcel_id: &str) -> bool {
@@ -249,6 +261,19 @@ impl MondialRelayProvider {
             return Err(Error::ProviderError { code, message });
         }
 
+        if let Some(status_msg) = response.status_error_message() {
+            tracing::warn!(
+                provider = "mondial-relay",
+                parcel_id = %parcel_id,
+                message = %status_msg,
+                "Mondial Relay response contained status error"
+            );
+            return Err(Error::ProviderError {
+                code: 0,
+                message: status_msg,
+            });
+        }
+
         Ok(Self::map_response(
             parcel_id,
             opts.postcode.as_deref(),
@@ -277,14 +302,46 @@ impl Provider for MondialRelayProvider {
             parcel_id = %parcel_id,
             has_postcode = opts.postcode.is_some(),
             mode = ?self.transport.mode(),
+            brands = ?self.brands,
             "starting Mondial Relay track request"
         );
 
-        let response = self
-            .transport
-            .fetch_tracking_response(parcel_id, opts)
-            .await?;
-        Self::map_provider_response(parcel_id, opts, response)
+        let mut last_error = None;
+
+        for (idx, brand) in self.brands.iter().enumerate() {
+            let response = self
+                .transport
+                .fetch_tracking_response(parcel_id, opts, brand)
+                .await;
+
+            match response {
+                Ok(resp) => {
+                    // Check for "no parcel found" status errors -- try next brand.
+                    if resp.status_error_message().is_some() && idx + 1 < self.brands.len() {
+                        tracing::debug!(
+                            provider = "mondial-relay",
+                            parcel_id = %parcel_id,
+                            brand = %brand,
+                            status_msg = %resp.status_error_message().unwrap_or_default(),
+                            "brand returned status error, trying next brand"
+                        );
+                        last_error =
+                            Some(Self::map_provider_response(parcel_id, opts, resp).unwrap_err());
+                        continue;
+                    }
+                    return Self::map_provider_response(parcel_id, opts, resp);
+                }
+                Err(err) => {
+                    // On transport errors, don't retry with other brands.
+                    return Err(err);
+                }
+            }
+        }
+
+        Err(last_error.unwrap_or_else(|| Error::ProviderError {
+            code: 0,
+            message: "no brand matched for this parcel".to_string(),
+        }))
     }
 }
 

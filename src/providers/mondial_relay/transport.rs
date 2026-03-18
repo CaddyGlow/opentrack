@@ -12,13 +12,12 @@ use super::{api, browser_cdp, models, token};
 pub(crate) fn build_tracking_transport(
     client: wreq::Client,
     country: String,
-    brand: String,
     mode: MondialRelayMode,
     cdp_browser: Arc<browser_cdp::SharedCdpBrowser>,
 ) -> Box<dyn TrackingTransport> {
     match mode {
-        MondialRelayMode::Api => Box::new(ApiTransport::new(client, country, brand)),
-        MondialRelayMode::Cdp => Box::new(CdpTransport::new(country, brand, cdp_browser)),
+        MondialRelayMode::Api => Box::new(ApiTransport::new(client, country)),
+        MondialRelayMode::Cdp => Box::new(CdpTransport::new(country, cdp_browser)),
     }
 }
 
@@ -30,27 +29,30 @@ pub(crate) trait TrackingTransport: Send + Sync {
         &self,
         parcel_id: &str,
         opts: &TrackOptions,
+        brand: &str,
     ) -> Result<models::MondialRelayResponse>;
 }
 
 struct ApiTransport {
     client: wreq::Client,
     country: String,
-    brand: String,
     request_verification_token: Arc<RwLock<Option<String>>>,
 }
 
 impl ApiTransport {
-    fn new(client: wreq::Client, country: String, brand: String) -> Self {
+    fn new(client: wreq::Client, country: String) -> Self {
         Self {
             client,
             country,
-            brand,
             request_verification_token: Arc::new(RwLock::new(None)),
         }
     }
 
-    async fn get_request_verification_token(&self, parcel_id: &str) -> Result<String> {
+    async fn get_request_verification_token(
+        &self,
+        parcel_id: &str,
+        brand: &str,
+    ) -> Result<String> {
         if let Some(token) = self.request_verification_token.read().await.clone() {
             tracing::debug!(
                 provider = "mondial-relay",
@@ -65,11 +67,11 @@ impl ApiTransport {
             provider = "mondial-relay",
             parcel_id = %parcel_id,
             country = %self.country,
-            brand = %self.brand,
+            brand = %brand,
             "fetching Mondial Relay tracking page to extract requestverificationtoken"
         );
         let html =
-            api::fetch_tracking_page(&self.client, parcel_id, &self.country, &self.brand).await?;
+            api::fetch_tracking_page(&self.client, parcel_id, &self.country, brand).await?;
         let token = token::extract_request_verification_token(&html).ok_or_else(|| {
             tracing::warn!(
                 provider = "mondial-relay",
@@ -113,13 +115,14 @@ impl TrackingTransport for ApiTransport {
         &self,
         parcel_id: &str,
         opts: &TrackOptions,
+        brand: &str,
     ) -> Result<models::MondialRelayResponse> {
-        let token = self.get_request_verification_token(parcel_id).await?;
+        let token = self.get_request_verification_token(parcel_id, brand).await?;
         let mut response = api::fetch_tracking(
             &self.client,
             parcel_id,
             opts.postcode.as_deref(),
-            &self.brand,
+            brand,
             &self.country,
             &token,
         )
@@ -132,12 +135,14 @@ impl TrackingTransport for ApiTransport {
                 "Mondial Relay returned 401, refreshing token and retrying once"
             );
             self.invalidate_request_verification_token().await;
-            let retry_token = self.get_request_verification_token(parcel_id).await?;
+            let retry_token = self
+                .get_request_verification_token(parcel_id, brand)
+                .await?;
             response = api::fetch_tracking(
                 &self.client,
                 parcel_id,
                 opts.postcode.as_deref(),
-                &self.brand,
+                brand,
                 &self.country,
                 &retry_token,
             )
@@ -150,17 +155,12 @@ impl TrackingTransport for ApiTransport {
 
 struct CdpTransport {
     country: String,
-    brand: String,
     browser: Arc<browser_cdp::SharedCdpBrowser>,
 }
 
 impl CdpTransport {
-    fn new(country: String, brand: String, browser: Arc<browser_cdp::SharedCdpBrowser>) -> Self {
-        Self {
-            country,
-            brand,
-            browser,
-        }
+    fn new(country: String, browser: Arc<browser_cdp::SharedCdpBrowser>) -> Self {
+        Self { country, browser }
     }
 }
 
@@ -174,13 +174,14 @@ impl TrackingTransport for CdpTransport {
         &self,
         parcel_id: &str,
         opts: &TrackOptions,
+        brand: &str,
     ) -> Result<models::MondialRelayResponse> {
         let body = self
             .browser
             .fetch_tracking_response_body(
                 parcel_id,
                 opts.postcode.as_deref(),
-                &self.brand,
+                brand,
                 &self.country,
             )
             .await?;

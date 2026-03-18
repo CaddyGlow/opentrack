@@ -47,9 +47,41 @@ pub struct MondialRelayResponse {
     pub expedition: Option<Box<MondialRelayResponse>>,
     #[serde(default, alias = "Result", alias = "result")]
     pub result: Option<Box<MondialRelayResponse>>,
+
+    /// Alternative error shape: `{"status":[{"state":"warn","message":"..."}]}`
+    #[serde(default)]
+    pub status: Option<Vec<MondialRelayStatusEntry>>,
+}
+
+/// Entry in the `"status"` array returned when the API has no results.
+/// Example: `{"state":"warn","message":"Il n'existe pas de colis pour ces critères de recherche"}`
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct MondialRelayStatusEntry {
+    #[serde(default)]
+    pub state: Option<String>,
+    #[serde(default)]
+    pub message: Option<String>,
 }
 
 impl MondialRelayResponse {
+    /// If the response contains a `"status"` array with warn/error entries and no
+    /// tracking data, return the combined error message.
+    pub fn status_error_message(&self) -> Option<String> {
+        let entries = self.status.as_ref()?;
+        if entries.is_empty() {
+            return None;
+        }
+        let messages: Vec<&str> = entries
+            .iter()
+            .filter_map(|entry| entry.message.as_deref())
+            .filter(|msg| !msg.is_empty())
+            .collect();
+        if messages.is_empty() {
+            return None;
+        }
+        Some(messages.join("; "))
+    }
+
     fn nested(&self) -> Option<&MondialRelayResponse> {
         self.data
             .as_deref()
